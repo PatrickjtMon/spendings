@@ -1,4 +1,4 @@
-# SpendWise AI
+# Spendings
 
 SpendWise AI is an AI-powered personal finance assistant.
 
