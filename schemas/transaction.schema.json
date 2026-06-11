@@ -1,0 +1,74 @@
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "date",
+      "merchant",
+      "amount",
+      "currency",
+      "category",
+      "type",
+      "confidence",
+      "needs_review"
+    ],
+    "properties": {
+      "date": {
+        "type": "string",
+        "description": "Transaction date in DD-MM-YYYY format",
+        "pattern": "^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-\\d{4}$"
+      },
+      "merchant": {
+        "type": "string",
+        "description": "Merchant, company, store, service, or person related to the transaction"
+      },
+      "amount": {
+        "type": "number",
+        "description": "Transaction amount. Negative for expenses, positive for income"
+      },
+      "currency": {
+        "type": "string",
+        "description": "Currency code. Default is EUR",
+        "default": "EUR"
+      },
+      "category": {
+        "type": "string",
+        "description": "Transaction category",
+        "enum": [
+          "Income",
+          "Housing",
+          "Groceries",
+          "Restaurants",
+          "Transport",
+          "Subscriptions",
+          "Health",
+          "Shopping",
+          "Entertainment",
+          "Savings",
+          "Transfers",
+          "Other"
+        ]
+      },
+      "type": {
+        "type": "string",
+        "description": "Transaction type",
+        "enum": [
+          "income",
+          "expense",
+          "transfer"
+        ]
+      },
+      "confidence": {
+        "type": "number",
+        "description": "AI confidence score from 0 to 1",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "needs_review": {
+        "type": "boolean",
+        "description": "True when the AI is uncertain and the user should review the transaction"
+      }
+    },
+    "additionalProperties": false
+  }
+}

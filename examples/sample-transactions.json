@@ -1,0 +1,32 @@
+[
+  {
+    "date": "2026-06-03",
+    "merchant": "Uber",
+    "amount": -12.0,
+    "currency": "EUR",
+    "category": "Transport",
+    "type": "expense",
+    "confidence": 0.95,
+    "needs_review": false
+  },
+  {
+    "date": "2026-06-03",
+    "merchant": "Continente",
+    "amount": -25.0,
+    "currency": "EUR",
+    "category": "Groceries",
+    "type": "expense",
+    "confidence": 0.96,
+    "needs_review": false
+  },
+  {
+    "date": "2026-06-03",
+    "merchant": "Coffee shop",
+    "amount": -7.0,
+    "currency": "EUR",
+    "category": "Restaurants",
+    "type": "expense",
+    "confidence": 0.82,
+    "needs_review": true
+  }
+]
