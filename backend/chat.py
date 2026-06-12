@@ -145,6 +145,7 @@ REQUIRED_FIELDS = {
     "needs_review",
 }
 
+DATA_FILE = "transactions.json"
 
 def validate_transactions(data):
     if not isinstance(data, list):
@@ -257,12 +258,27 @@ def review_transactions(transactions):
 
         answer = input("Save this transaction? (y/n): ").strip().lower()
 
-        if answer == "y":
+        if answer == "y" or answer == "yes":
             confirmed_transactions.append(transaction)
         else:
             print("Transaction skipped.")
 
     return confirmed_transactions
+
+def load_saved_transactions():
+    if not os.path.exists(DATA_FILE):
+        return []
+
+    with open(DATA_FILE, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def save_transactions(transactions):
+    saved_transactions = load_saved_transactions()
+    saved_transactions.extend(transactions)
+
+    with open(DATA_FILE, "w", encoding="utf-8") as file:
+        json.dump(saved_transactions, file, indent=2, ensure_ascii=False)
 
 while True:
     user_input = input("Describe your spending: ").strip()
@@ -299,5 +315,7 @@ while True:
         print("No transactions confirmed.")
         continue
 
-    print("\nConfirmed transactions:")
+    save_transactions(confirmed_transactions)
+
+    print("\nSaved transactions:")
     print(json.dumps(confirmed_transactions, indent=2, ensure_ascii=False))
