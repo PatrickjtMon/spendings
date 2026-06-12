@@ -600,6 +600,17 @@ def is_valid_date(date: str) -> bool:
     pattern = r"^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-\d{4}$"
     return bool(re.match(pattern, date))
 
+def view_transaction(transaction_id: str):
+    transactions = load_saved_transactions()
+
+    for transaction in transactions:
+        if transaction.get("id") == transaction_id:
+            print("\nTransaction details:")
+            print(json.dumps(transaction, indent=2, ensure_ascii=False))
+            return
+
+    print("Transaction not found.")
+
 while True:
     user_input = input("Describe your spending: ").strip()
 
@@ -678,6 +689,17 @@ while True:
         new_value = parts[3]
 
         edit_transaction(transaction_id, field, new_value)
+        continue
+
+    if user_input.lower().startswith("view "):
+        parts = user_input.split()
+
+        if len(parts) != 2:
+            print("Use: view transaction_id")
+            continue
+
+        transaction_id = parts[1]
+        view_transaction(transaction_id)
         continue
     has_money = user_mentioned_money(user_input)
     has_desc = has_description(user_input)
