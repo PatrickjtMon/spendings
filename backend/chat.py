@@ -147,6 +147,8 @@ REQUIRED_FIELDS = {
 
 DATA_FILE = "transactions.json"
 
+BUDGETS_FILE = "budgets.json"
+
 def validate_transactions(data):
     if not isinstance(data, list):
         print("Invalid response: AI output must be a list.")
@@ -280,11 +282,105 @@ def save_transactions(transactions):
     with open(DATA_FILE, "w", encoding="utf-8") as file:
         json.dump(saved_transactions, file, indent=2, ensure_ascii=False)
 
+def get_transaction_month(date: str) -> str:
+    # date format: DD-MM-YYYY
+    day, month, year = date.split("-")
+    return f"{month}-{year}"
+
+def show_monthly_summary(month_filter=None):
+    transactions = load_saved_transactions()
+
+    if not transactions:
+        print("No transactions saved yet.")
+        return
+
+    monthly_totals = {}
+
+    for transaction in transactions:
+        transaction_month = get_transaction_month(transaction["date"])
+
+        if month_filter and transaction_month != month_filter:
+            continue
+
+        if transaction["amount"] < 0:
+            category = transaction["category"]
+            amount = abs(transaction["amount"])
+
+            if transaction_month not in monthly_totals:
+                monthly_totals[transaction_month] = {
+                    "total_spent": 0,
+                    "categories": {}
+                }
+
+            monthly_totals[transaction_month]["total_spent"] += amount
+
+            monthly_totals[transaction_month]["categories"][category] = (
+                monthly_totals[transaction_month]["categories"].get(category, 0) + amount
+            )
+
+    if not monthly_totals:
+        print("No transactions found for that month.")
+        return
+
+    for month, data in monthly_totals.items():
+        print(f"\nSummary for {month}:")
+        print(f"Total spent: €{data['total_spent']:.2f}")
+
+        print("\nBy category:")
+        for category, total in data["categories"].items():
+            print(f"- {category}: €{total:.2f}")
+
+        print()
+
+def load_budgets():
+    if not os.path.exists(BUDGETS_FILE):
+        return {}
+
+    with open(BUDGETS_FILE, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def save_budgets(budgets):
+    with open(BUDGETS_FILE, "w", encoding="utf-8") as file:
+        json.dump(budgets, file, indent=2, ensure_ascii=False)
+
+
+def set_monthly_budget(month: str, amount: float):
+    budgets = load_budgets()
+    budgets[month] = amount
+    save_budgets(budgets)
+
+    print(f"Budget for {month} set to €{amount:.2f}")
+
+
 while True:
     user_input = input("Describe your spending: ").strip()
 
     if user_input.lower() in ["exit", "quit"]:
         break
+
+    if user_input.lower() == "summary":
+        show_monthly_summary()
+        continue
+    
+    if user_input.lower().startswith("summary "):
+        month = user_input.split(" ", 1)[1]
+        show_monthly_summary(month)
+        continue
+
+    if user_input.lower().startswith("budget "):
+        parts = user_input.split()
+
+        if len(parts) != 3:
+            print("Use: budget MM-YYYY amount")
+            continue
+
+        month = parts[1]
+        amount = float(parts[2])
+
+        set_monthly_budget(month, amount)
+        print(f"Budget for {month} set to {amount}")
+        continue
 
     has_money = user_mentioned_money(user_input)
     has_desc = has_description(user_input)
