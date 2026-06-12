@@ -289,6 +289,7 @@ def get_transaction_month(date: str) -> str:
 
 def show_monthly_summary(month_filter=None):
     transactions = load_saved_transactions()
+    budgets = load_budgets()
 
     if not transactions:
         print("No transactions saved yet.")
@@ -321,10 +322,26 @@ def show_monthly_summary(month_filter=None):
     if not monthly_totals:
         print("No transactions found for that month.")
         return
-
+    
+    
     for month, data in monthly_totals.items():
         print(f"\nSummary for {month}:")
-        print(f"Total spent: €{data['total_spent']:.2f}")
+        budget = budgets.get(month)
+
+        if budget is not None:
+            remaining = budget - data["total_spent"]
+
+            print(f"Budget: €{budget:.2f}")
+            print(f"Spent: €{data['total_spent']:.2f}")
+            print(f"Remaining: €{remaining:.2f}")
+
+            if remaining < 0:
+                print(f"Status: Over budget by €{abs(remaining):.2f}")
+            else:
+                print(f"Status: Under budget by €{remaining:.2f}")
+        else:
+            print("Budget: not set")
+            print(f"Spent: €{data['total_spent']:.2f}")
 
         print("\nBy category:")
         for category, total in data["categories"].items():
@@ -379,7 +396,6 @@ while True:
         amount = float(parts[2])
 
         set_monthly_budget(month, amount)
-        print(f"Budget for {month} set to {amount}")
         continue
 
     has_money = user_mentioned_money(user_input)
