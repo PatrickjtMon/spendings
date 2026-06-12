@@ -247,6 +247,22 @@ def parse_llm_json(text: str):
         print("The AI returned invalid JSON.")
         print(cleaned_text)
         return None
+    
+def review_transactions(transactions):
+    confirmed_transactions = []
+
+    for transaction in transactions:
+        print("\nTransaction found:")
+        print(json.dumps(transaction, indent=2, ensure_ascii=False))
+
+        answer = input("Save this transaction? (y/n): ").strip().lower()
+
+        if answer == "y":
+            confirmed_transactions.append(transaction)
+        else:
+            print("Transaction skipped.")
+
+    return confirmed_transactions
 
 while True:
     user_input = input("Describe your spending: ").strip()
@@ -277,8 +293,11 @@ while True:
 
     valid_transactions = validate_transactions(parsed_result)
 
-    if not valid_transactions:
-        print("No valid transactions found.")
+    confirmed_transactions = review_transactions(valid_transactions)
+
+    if not confirmed_transactions:
+        print("No transactions confirmed.")
         continue
 
-    print(json.dumps(parsed_result, indent=2, ensure_ascii=False))
+    print("\nConfirmed transactions:")
+    print(json.dumps(confirmed_transactions, indent=2, ensure_ascii=False))
