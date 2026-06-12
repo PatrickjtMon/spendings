@@ -474,6 +474,25 @@ def show_transactions(month_filter=None):
 
     print()
 
+def delete_transaction(index: int):
+    transactions = load_saved_transactions()
+
+    if not transactions:
+        print("No transactions saved yet.")
+        return
+
+    if index < 1 or index > len(transactions):
+        print("Invalid transaction number.")
+        return
+
+    removed_transaction = transactions.pop(index - 1)
+
+    with open(DATA_FILE, "w", encoding="utf-8") as file:
+        json.dump(transactions, file, indent=2, ensure_ascii=False)
+
+    print("Deleted transaction:")
+    print(json.dumps(removed_transaction, indent=2, ensure_ascii=False))
+
 while True:
     user_input = input("Describe your spending: ").strip()
 
@@ -527,7 +546,22 @@ while True:
         month = user_input.split(" ", 1)[1]
         show_transactions(month)
         continue
+    
+    if user_input.lower().startswith("delete "):
+        parts = user_input.split()
 
+        if len(parts) != 2:
+            print("Use: delete transaction_number")
+            continue
+
+        try:
+            index = int(parts[1])
+        except ValueError:
+            print("Invalid number. Use: delete transaction_number")
+            continue
+
+        delete_transaction(index)
+        continue
     has_money = user_mentioned_money(user_input)
     has_desc = has_description(user_input)
 
