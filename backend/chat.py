@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from anthropic import Anthropic
 import re
 import json
+import uuid
 
 load_dotenv()
 client = Anthropic(
@@ -474,24 +475,94 @@ def show_transactions(month_filter=None):
 
     print()
 
-def delete_transaction(index: int):
+def delete_transaction(transaction_id: str):
     transactions = load_saved_transactions()
 
     if not transactions:
         print("No transactions saved yet.")
         return
 
-    if index < 1 or index > len(transactions):
-        print("Invalid transaction number.")
+    transaction_to_delete = None
+
+    for transaction in transactions:
+        if transaction.get("id") == transaction_id:
+            transaction_to_delete = transaction
+            break
+
+    if transaction_to_delete is None:
+        print("Transaction not found.")
         return
 
-    removed_transaction = transactions.pop(index - 1)
+    transactions.remove(transaction_to_delete)
 
     with open(DATA_FILE, "w", encoding="utf-8") as file:
         json.dump(transactions, file, indent=2, ensure_ascii=False)
 
     print("Deleted transaction:")
-    print(json.dumps(removed_transaction, indent=2, ensure_ascii=False))
+    print(json.dumps(transaction_to_delete, indent=2, ensure_ascii=False))
+
+def generate_unique_transaction_id(existing_ids):
+    while True:
+        transaction_id = f"tx_{uuid.uuid4().hex[:12]}"
+
+        if transaction_id not in existing_ids:
+            return transaction_id
+
+
+def add_transaction_ids(transactions):
+    saved_transactions = load_saved_transactions()
+    existing_ids = {transaction.get("id") for transaction in saved_transactions}
+
+    for transaction in transactions:
+        if "id" not in transaction:
+            transaction["id"] = generate_unique_transaction_id(existing_ids)
+            existing_ids.add(transaction["id"])
+
+    return transactions
+
+def edit_transaction(transaction_id: str, field: str, new_value: str):
+    transactions = load_saved_transactions()
+
+    allowed_fields = {
+        "date",
+        "description",
+        "merchant",
+        "amount",
+        "currency",
+        "category",
+        "type",
+        "confidence",
+        "needs_review",
+    }
+
+    if field not in allowed_fields:
+        print(f"Invalid field. Allowed fields: {', '.join(sorted(allowed_fields))}")
+        return
+
+    for transaction in transactions:
+        if transaction.get("id") == transaction_id:
+            if field == "amount":
+                new_value = float(new_value)
+
+            if field == "confidence":
+                new_value = float(new_value)
+
+            if field == "needs_review":
+                new_value = new_value.lower() in ["true", "yes", "y"]
+
+            if field == "merchant" and new_value.lower() in ["none", "null"]:
+                new_value = None
+
+            transaction[field] = new_value
+
+            with open(DATA_FILE, "w", encoding="utf-8") as file:
+                json.dump(transactions, file, indent=2, ensure_ascii=False)
+
+            print("Updated transaction:")
+            print(json.dumps(transaction, indent=2, ensure_ascii=False))
+            return
+
+    print("Transaction not found.")
 
 while True:
     user_input = input("Describe your spending: ").strip()
@@ -551,16 +622,26 @@ while True:
         parts = user_input.split()
 
         if len(parts) != 2:
-            print("Use: delete transaction_number")
+            print("Use: delete transaction_id")
             continue
 
-        try:
-            index = int(parts[1])
-        except ValueError:
-            print("Invalid number. Use: delete transaction_number")
+        transaction_id = parts[1]
+
+        delete_transaction(transaction_id)
+        continue
+
+    if user_input.lower().startswith("edit "):
+        parts = user_input.split(" ", 3)
+
+        if len(parts) != 4:
+            print("Use: edit transaction_id field new_value")
             continue
 
-        delete_transaction(index)
+        transaction_id = parts[1]
+        field = parts[2]
+        new_value = parts[3]
+
+        edit_transaction(transaction_id, field, new_value)
         continue
     has_money = user_mentioned_money(user_input)
     has_desc = has_description(user_input)
@@ -590,6 +671,8 @@ while True:
     if not confirmed_transactions:
         print("No transactions confirmed.")
         continue
+
+    confirmed_transactions = add_transaction_ids(confirmed_transactions)
 
     save_transactions(confirmed_transactions)
 
