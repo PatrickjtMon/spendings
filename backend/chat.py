@@ -552,6 +552,38 @@ def edit_transaction(transaction_id: str, field: str, new_value: str):
 
             if field == "merchant" and new_value.lower() in ["none", "null"]:
                 new_value = None
+            if field == "date":
+                if not is_valid_date(new_value):
+                    print("Invalid date. Use DD-MM-YYYY.")
+                    return
+
+            if field == "category":
+                if new_value not in ALLOWED_CATEGORIES:
+                    print(f"Invalid category. Allowed categories: {', '.join(sorted(ALLOWED_CATEGORIES))}")
+                    return
+
+            if field == "type":
+                if new_value not in ALLOWED_TYPES:
+                    print(f"Invalid type. Allowed types: {', '.join(sorted(ALLOWED_TYPES))}")
+                    return
+
+            if field == "amount":
+                try:
+                    new_value = float(new_value)
+                except ValueError:
+                    print("Invalid amount. Use a number, for example: -12.50")
+                    return
+
+            if field == "confidence":
+                try:
+                    new_value = float(new_value)
+                except ValueError:
+                    print("Invalid confidence. Use a number from 0 to 1.")
+                    return
+
+                if not 0 <= new_value <= 1:
+                    print("Invalid confidence. Use a number from 0 to 1.")
+                    return
 
             transaction[field] = new_value
 
@@ -563,6 +595,10 @@ def edit_transaction(transaction_id: str, field: str, new_value: str):
             return
 
     print("Transaction not found.")
+
+def is_valid_date(date: str) -> bool:
+    pattern = r"^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-\d{4}$"
+    return bool(re.match(pattern, date))
 
 while True:
     user_input = input("Describe your spending: ").strip()
