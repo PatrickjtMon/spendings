@@ -149,6 +149,8 @@ DATA_FILE = "transactions.json"
 
 BUDGETS_FILE = "budgets.json"
 
+CATEGORY_BUDGETS_FILE = "category_budgets.json"
+
 def validate_transactions(data):
     if not isinstance(data, list):
         print("Invalid response: AI output must be a list.")
@@ -290,6 +292,7 @@ def get_transaction_month(date: str) -> str:
 def show_monthly_summary(month_filter=None):
     transactions = load_saved_transactions()
     budgets = load_budgets()
+    category_budgets = load_category_budgets()
 
     if not transactions:
         print("No transactions saved yet.")
@@ -344,10 +347,27 @@ def show_monthly_summary(month_filter=None):
             print(f"Spent: €{data['total_spent']:.2f}")
 
         print("\nBy category:")
-        for category, total in data["categories"].items():
-            print(f"- {category}: €{total:.2f}")
 
-        print()
+    month_category_budgets = category_budgets.get(month, {})
+
+    for category, total in data["categories"].items():
+        category_budget = month_category_budgets.get(category)
+
+        if category_budget is not None:
+            remaining = category_budget - total
+
+            if remaining < 0:
+                print(
+                    f"- {category}: €{total:.2f} / €{category_budget:.2f} "
+                    f"(over by €{abs(remaining):.2f})"
+                )
+            else:
+                print(
+                    f"- {category}: €{total:.2f} / €{category_budget:.2f} "
+                    f"(remaining €{remaining:.2f})"
+                )
+        else:
+            print(f"- {category}: €{total:.2f} / no category budget")
 
 def load_budgets():
     if not os.path.exists(BUDGETS_FILE):
@@ -368,6 +388,36 @@ def set_monthly_budget(month: str, amount: float):
     save_budgets(budgets)
 
     print(f"Budget for {month} set to €{amount:.2f}")
+
+
+def load_category_budgets():
+    if not os.path.exists(CATEGORY_BUDGETS_FILE):
+        return {}
+
+    with open(CATEGORY_BUDGETS_FILE, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def save_category_budgets(category_budgets):
+    with open(CATEGORY_BUDGETS_FILE, "w", encoding="utf-8") as file:
+        json.dump(category_budgets, file, indent=2, ensure_ascii=False)
+
+
+def set_category_budget(month: str, category: str, amount: float):
+    if category not in ALLOWED_CATEGORIES:
+        print(f"Invalid category: {category}")
+        return
+
+    category_budgets = load_category_budgets()
+
+    if month not in category_budgets:
+        category_budgets[month] = {}
+
+    category_budgets[month][category] = amount
+
+    save_category_budgets(category_budgets)
+
+    print(f"Budget for {category} in {month} set to €{amount:.2f}")
 
 
 while True:
@@ -396,6 +446,20 @@ while True:
         amount = float(parts[2])
 
         set_monthly_budget(month, amount)
+        continue
+
+    if user_input.lower().startswith("category-budget "):
+        parts = user_input.split()
+
+        if len(parts) != 4:
+            print("Use: category-budget MM-YYYY Category amount")
+            continue
+
+        month = parts[1]
+        category = parts[2]
+        amount = float(parts[3])
+
+        set_category_budget(month, category, amount)
         continue
 
     has_money = user_mentioned_money(user_input)
