@@ -440,6 +440,39 @@ Other:
   help
   exit
 """)
+    
+def show_transactions(month_filter=None):
+    transactions = load_saved_transactions()
+
+    if not transactions:
+        print("No transactions saved yet.")
+        return
+
+    filtered_transactions = []
+
+    for transaction in transactions:
+        transaction_month = get_transaction_month(transaction["date"])
+
+        if month_filter and transaction_month != month_filter:
+            continue
+
+        filtered_transactions.append(transaction)
+
+    if not filtered_transactions:
+        print("No transactions found.")
+        return
+
+    print("\nSaved transactions:")
+
+    for index, transaction in enumerate(filtered_transactions, start=1):
+        print(
+            f"{index}. {transaction['date']} | "
+            f"{transaction['description']} | "
+            f"{transaction['category']} | "
+            f"€{transaction['amount']:.2f}"
+        )
+
+    print()
 
 while True:
     user_input = input("Describe your spending: ").strip()
@@ -484,6 +517,15 @@ while True:
         amount = float(parts[3])
 
         set_category_budget(month, category, amount)
+        continue
+
+    if user_input.lower() == "transactions":
+        show_transactions()
+        continue
+
+    if user_input.lower().startswith("transactions "):
+        month = user_input.split(" ", 1)[1]
+        show_transactions(month)
         continue
 
     has_money = user_mentioned_money(user_input)
