@@ -419,13 +419,37 @@ def set_category_budget(month: str, category: str, amount: float):
 
     print(f"Budget for {category} in {month} set to €{amount:.2f}")
 
+def show_help():
+    print("""
+Available commands:
+
+Expense input:
+  chocolate 10
+  spent 12 euros on Uber
+  paid 25 at Continente
+
+Budget commands:
+  budget MM-YYYY amount
+  category-budget MM-YYYY Category amount
+
+Summary commands:
+  summary
+  summary MM-YYYY
+
+Other:
+  help
+  exit
+""")
 
 while True:
     user_input = input("Describe your spending: ").strip()
 
     if user_input.lower() in ["exit", "quit"]:
         break
-
+    
+    if user_input.lower() == "help":
+        show_help()
+        continue
     if user_input.lower() == "summary":
         show_monthly_summary()
         continue
