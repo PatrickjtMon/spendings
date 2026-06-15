@@ -142,6 +142,19 @@ Rules:
 - Keep the response concise.
 - Return plain text, not JSON.
 """
+QA_PROMPT = """
+You are an AI personal finance assistant.
+
+Answer the user's question using only the provided monthly financial data.
+
+Rules:
+- Do not invent numbers.
+- If the data is missing, say what is missing.
+- Be specific and practical.
+- Do not give investment advice.
+- Keep the answer concise.
+- Return plain text, not JSON.
+"""
 
 ALLOWED_CATEGORIES = {
     "Income",
@@ -734,6 +747,34 @@ def generate_monthly_advice(month: str):
     print(response.content[0].text)
     print()
 
+def ask_monthly_question(month: str, question: str):
+    summary_data = build_monthly_summary_data(month)
+
+    if summary_data is None:
+        print("No transactions found for that month.")
+        return
+
+    user_content = {
+        "monthly_data": summary_data,
+        "question": question
+    }
+
+    response = client.messages.create(
+        model=os.getenv("ANTHROPIC_MODEL"),
+        max_tokens=500,
+        system=QA_PROMPT,
+        messages=[
+            {
+                "role": "user",
+                "content": json.dumps(user_content, indent=2, ensure_ascii=False)
+            }
+        ]
+    )
+
+    print(f"\nAI Answer for {month}:")
+    print(response.content[0].text)
+    print()
+
 while True:
     user_input = input("Describe your spending: ").strip()
 
@@ -847,6 +888,18 @@ while True:
         generate_monthly_advice(month)
         continue
 
+    if user_input.lower().startswith("ask "):
+        parts = user_input.split(" ", 2)
+
+        if len(parts) != 3:
+            print("Use: ask MM-YYYY your question")
+            continue
+
+        month = parts[1]
+        question = parts[2]
+
+        ask_monthly_question(month, question)
+        continue
     has_money = user_mentioned_money(user_input)
     has_desc = has_description(user_input)
 
