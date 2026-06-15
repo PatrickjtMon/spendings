@@ -156,6 +156,52 @@ Rules:
 - Return plain text, not JSON.
 """
 
+ANOMALY_PROMPT = """
+You are an AI personal finance analyst.
+
+Your job is to detect unusual or risky patterns in the user's monthly financial data.
+
+Rules:
+- Use only the data provided.
+- Do not invent numbers.
+- Always use EUR (€) as the currency symbol.
+- Do not use USD ($).
+- Focus only on anomalies, risks, unusual patterns, budget risks, high category spending, and transactions that need review.
+- If nothing unusual is found, say that clearly.
+- If the month has very few transactions, mention that the analysis may be incomplete.
+- Be concise and practical.
+- Do not use Markdown headings.
+- Do not use bold text.
+- Return plain text, not JSON.
+"""
+
+RECATEGORIZE_PROMPT = """
+You are an AI financial transaction categorization assistant.
+
+Review the provided transactions and suggest better categories when needed.
+
+Rules:
+- Return ONLY raw JSON.
+- Do not use Markdown.
+- Do not add explanations outside the JSON.
+- Do not invent transactions.
+- Do not remove transactions.
+- Do not change amounts, dates, merchants, descriptions, currency, type, confidence, or needs_review.
+- Only suggest a new category if the current category is clearly wrong.
+- Use only the allowed categories.
+
+Allowed categories:
+Income, Housing, Groceries, Restaurants, Transport, Subscriptions, Health, Shopping, Entertainment, Savings, Transfers, Other.
+
+Return an array of suggestions with:
+- id
+- description
+- current_category
+- suggested_category
+- should_change
+- reason
+"""
+
 ALLOWED_CATEGORIES = {
     "Income",
     "Housing",
@@ -661,6 +707,8 @@ def build_monthly_summary_data(month: str):
 
     month_transactions = []
 
+    needs_review_transactions = []
+
     total_income = 0
     total_spent = 0
     category_totals = {}
@@ -670,6 +718,9 @@ def build_monthly_summary_data(month: str):
 
         if transaction_month != month:
             continue
+
+        if transaction.get("needs_review"):
+            needs_review_transactions.append(transaction)
 
         month_transactions.append(transaction)
 
@@ -699,6 +750,7 @@ def build_monthly_summary_data(month: str):
         "net_balance": net_balance,
         "category_totals": category_totals,
         "transaction_count": len(month_transactions),
+        "needs_review_transactions": needs_review_transactions,
     }
 
 def generate_monthly_insights(month: str):
@@ -774,6 +826,117 @@ def ask_monthly_question(month: str, question: str):
     print(f"\nAI Answer for {month}:")
     print(response.content[0].text)
     print()
+
+def detect_monthly_anomalies(month: str):
+    summary_data = build_monthly_summary_data(month)
+
+    if summary_data is None:
+        print("No transactions found for that month.")
+        return
+
+    response = client.messages.create(
+        model=os.getenv("ANTHROPIC_MODEL"),
+        max_tokens=500,
+        system=ANOMALY_PROMPT,
+        messages=[
+            {
+                "role": "user",
+                "content": json.dumps(summary_data, indent=2, ensure_ascii=False)
+            }
+        ]
+    )
+
+    print(f"\nAI Anomalies for {month}:")
+    print(response.content[0].text)
+    print()
+
+def recategorize_month(month: str):
+    transactions = load_saved_transactions()
+
+    month_transactions = [
+        transaction
+        for transaction in transactions
+        if get_transaction_month(transaction["date"]) == month
+    ]
+
+    if not month_transactions:
+        print("No transactions found for that month.")
+        return
+
+    transactions_for_ai = [
+        {
+            "id": transaction.get("id"),
+            "description": transaction["description"],
+            "merchant": transaction["merchant"],
+            "amount": transaction["amount"],
+            "current_category": transaction["category"],
+            "type": transaction["type"],
+        }
+        for transaction in month_transactions
+    ]
+
+    response = client.messages.create(
+        model=os.getenv("ANTHROPIC_MODEL"),
+        max_tokens=1000,
+        system=RECATEGORIZE_PROMPT,
+        messages=[
+            {
+                "role": "user",
+                "content": json.dumps(transactions_for_ai, indent=2, ensure_ascii=False),
+            }
+        ],
+    )
+
+    suggestions = parse_llm_json(response.content[0].text)
+
+    if suggestions is None:
+        return
+
+    if not isinstance(suggestions, list):
+        print("Invalid AI response: expected a list.")
+        return
+
+    changes_to_apply = []
+
+    for suggestion in suggestions:
+        if not suggestion.get("should_change"):
+            continue
+
+        transaction_id = suggestion.get("id")
+        current_category = suggestion.get("current_category")
+        suggested_category = suggestion.get("suggested_category")
+        description = suggestion.get("description")
+        reason = suggestion.get("reason")
+
+        if suggested_category not in ALLOWED_CATEGORIES:
+            print(f"Skipped invalid category: {suggested_category}")
+            continue
+
+        print("\nSuggested category change:")
+        print(f"ID: {transaction_id}")
+        print(f"Description: {description}")
+        print(f"Current category: {current_category}")
+        print(f"Suggested category: {suggested_category}")
+        print(f"Reason: {reason}")
+
+        answer = input("Apply this change? (y/n): ").strip().lower()
+
+        if answer in ["y", "yes"]:
+            changes_to_apply.append((transaction_id, suggested_category))
+
+    if not changes_to_apply:
+        print("No category changes applied.")
+        return
+
+    for transaction in transactions:
+        for transaction_id, suggested_category in changes_to_apply:
+            if transaction.get("id") == transaction_id:
+                transaction["category"] = suggested_category
+
+    with open(DATA_FILE, "w", encoding="utf-8") as file:
+        json.dump(transactions, file, indent=2, ensure_ascii=False)
+
+    print("Category changes applied.")
 
 while True:
     user_input = input("Describe your spending: ").strip()
@@ -899,6 +1062,28 @@ while True:
         question = parts[2]
 
         ask_monthly_question(month, question)
+        continue
+
+    if user_input.lower().startswith("anomalies "):
+        parts = user_input.split()
+
+        if len(parts) != 2:
+            print("Use: anomalies MM-YYYY")
+            continue
+
+        month = parts[1]
+        detect_monthly_anomalies(month)
+        continue
+
+    if user_input.lower().startswith("recategorize "):
+        parts = user_input.split()
+
+        if len(parts) != 2:
+            print("Use: recategorize MM-YYYY")
+            continue
+
+        month = parts[1]
+        recategorize_month(month)
         continue
     has_money = user_mentioned_money(user_input)
     has_desc = has_description(user_input)
