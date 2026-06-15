@@ -112,7 +112,21 @@ Output format example:
   }
 ]
 """
+INSIGHTS_PROMPT = """
+You are an AI personal finance assistant.
 
+Your job is to analyze a monthly financial summary and generate useful insights.
+
+Rules:
+- Do not invent numbers.
+- Use only the data provided.
+- Be practical and specific.
+- Mention budget status.
+- Mention category spending.
+- Mention possible risks or savings opportunities.
+- Keep the response concise.
+- Return plain text, not JSON.
+""" 
 ALLOWED_CATEGORIES = {
     "Income",
     "Housing",
@@ -611,6 +625,76 @@ def view_transaction(transaction_id: str):
 
     print("Transaction not found.")
 
+def build_monthly_summary_data(month: str):
+    transactions = load_saved_transactions()
+    budgets = load_budgets()
+    category_budgets = load_category_budgets()
+
+    month_transactions = []
+
+    total_income = 0
+    total_spent = 0
+    category_totals = {}
+
+    for transaction in transactions:
+        transaction_month = get_transaction_month(transaction["date"])
+
+        if transaction_month != month:
+            continue
+
+        month_transactions.append(transaction)
+
+        amount = transaction["amount"]
+
+        if amount < 0:
+            expense_amount = abs(amount)
+            total_spent += expense_amount
+
+            category = transaction["category"]
+            category_totals[category] = category_totals.get(category, 0) + expense_amount
+
+        elif amount > 0:
+            total_income += amount
+
+    if not month_transactions:
+        return None
+
+    net_balance = total_income - total_spent
+
+    return {
+        "month": month,
+        "monthly_budget": budgets.get(month),
+        "category_budgets": category_budgets.get(month, {}),
+        "total_income": total_income,
+        "total_spent": total_spent,
+        "net_balance": net_balance,
+        "category_totals": category_totals,
+        "transaction_count": len(month_transactions),
+    }
+
+def generate_monthly_insights(month: str):
+    summary_data = build_monthly_summary_data(month)
+
+    if summary_data is None:
+        print("No transactions found for that month.")
+        return
+
+    response = client.messages.create(
+        model=os.getenv("ANTHROPIC_MODEL"),
+        max_tokens=500,
+        system=INSIGHTS_PROMPT,
+        messages=[
+            {
+                "role": "user",
+                "content": json.dumps(summary_data, indent=2, ensure_ascii=False)
+            }
+        ]
+    )
+
+    print(f"\nAI Insights for {month}:")
+    print(response.content[0].text)
+    print()
+
 while True:
     user_input = input("Describe your spending: ").strip()
 
@@ -701,6 +785,18 @@ while True:
         transaction_id = parts[1]
         view_transaction(transaction_id)
         continue
+
+    if user_input.lower().startswith("insights "):
+        parts = user_input.split()
+
+        if len(parts) != 2:
+            print("Use: insights MM-YYYY")
+            continue
+
+        month = parts[1]
+        generate_monthly_insights(month)
+        continue
+
     has_money = user_mentioned_money(user_input)
     has_desc = has_description(user_input)
 
