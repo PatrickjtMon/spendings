@@ -127,6 +127,22 @@ Rules:
 - Keep the response concise.
 - Return plain text, not JSON.
 """ 
+ADVICE_PROMPT = """
+You are an AI personal finance coach.
+
+Your job is to give practical advice based on the user's monthly financial summary.
+
+Rules:
+- Do not invent numbers.
+- Use only the data provided.
+- Be specific and actionable.
+- Focus on budget control, savings, and spending habits.
+- Do not give investment advice.
+- Do not shame the user.
+- Keep the response concise.
+- Return plain text, not JSON.
+"""
+
 ALLOWED_CATEGORIES = {
     "Income",
     "Housing",
@@ -695,6 +711,29 @@ def generate_monthly_insights(month: str):
     print(response.content[0].text)
     print()
 
+def generate_monthly_advice(month: str):
+    summary_data = build_monthly_summary_data(month)
+
+    if summary_data is None:
+        print("No transactions found for that month.")
+        return
+
+    response = client.messages.create(
+        model=os.getenv("ANTHROPIC_MODEL"),
+        max_tokens=500,
+        system=ADVICE_PROMPT,
+        messages=[
+            {
+                "role": "user",
+                "content": json.dumps(summary_data, indent=2, ensure_ascii=False)
+            }
+        ]
+    )
+
+    print(f"\nAI Advice for {month}:")
+    print(response.content[0].text)
+    print()
+
 while True:
     user_input = input("Describe your spending: ").strip()
 
@@ -795,6 +834,17 @@ while True:
 
         month = parts[1]
         generate_monthly_insights(month)
+        continue
+    
+    if user_input.lower().startswith("advice "):
+        parts = user_input.split()
+
+        if len(parts) != 2:
+            print("Use: advice MM-YYYY")
+            continue
+
+        month = parts[1]
+        generate_monthly_advice(month)
         continue
 
     has_money = user_mentioned_money(user_input)
