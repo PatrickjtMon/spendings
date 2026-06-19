@@ -1,0 +1,20 @@
+[
+  {
+    "id": "rec_1fa69569754a",
+    "name": "gpt",
+    "amount": -11.0,
+    "currency": "EUR",
+    "category": "Subscriptions",
+    "frequency": "monthly",
+    "active": true
+  },
+  {
+    "id": "rec_b37455c80afd",
+    "name": "rent",
+    "amount": -200.0,
+    "currency": "EUR",
+    "category": "Housing",
+    "frequency": "monthly",
+    "active": true
+  }
+]

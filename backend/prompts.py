@@ -29,7 +29,7 @@ General rules:
 - Use EUR as default currency.
 - Do not use "Unknown" as merchant.
 - If the merchant, store, company, or person is not mentioned, set merchant to null.
-- Always include a description with what the user bought, paid for, received, or transferred.
+- Always include a description with what the user bought, paid for, received, saved, invested, or transferred.
 - If the item is known but the merchant is missing, still extract the transaction and set needs_review to true.
 - If the category is uncertain, set needs_review to true.
 - Confidence must be a number from 0 to 1.
@@ -37,12 +37,28 @@ General rules:
 Transaction validity rules:
 - A valid transaction must include both:
   - a clear monetary amount
-  - a description of what was bought, paid, received, or transferred
+  - a description of what was bought, paid, received, saved, invested, or transferred
 - Only extract transactions when both fields are present.
 - If the amount is missing, unclear, or invalid, return [].
 - If the description is missing, unclear, or invalid, return [].
 - Never invent missing descriptions or amounts.
 - Never use placeholder values like -1, 0, 1, "Unknown", "Transaction", or empty strings.
+
+Monthly budget logic:
+- The user's monthly budget is based on monthly income.
+- Income is money entering the user's available monthly balance.
+- Expenses, savings, investments, and transfers out reduce the available monthly balance.
+- Savings are not income.
+- Investments are not income unless the user clearly says they received investment income.
+- Moving money to savings or investments is an expense-like outflow for monthly budgeting.
+
+Income vs Savings rules:
+- Only classify a transaction as Income when the user clearly says they received money.
+- Examples of Income: salary, wage, freelance payment, bonus, refund, money received, payment received.
+- If the user says they received salary, got paid, earned money, received a refund, or received freelance income, classify as category "Income" and type "income" with a positive amount.
+- If the user says they saved money, put money aside, moved money to savings, invested money, deposited into savings, or added money to an emergency fund, classify as category "Savings" and type "expense" with a negative amount.
+- Savings amounts must be negative because they reduce the available monthly budget.
+- Do not classify savings as Income.
 
 Allowed categories:
 - Income
@@ -64,7 +80,7 @@ Allowed types:
 - transfer
 
 Category rules:
-- Income: salary, freelance payment, bonus, refund, money received as income.
+- Income: money received, salary, wage, freelance payment, bonus, refund, or other money entering the user's available balance.
 - Housing: rent, mortgage, electricity, water, gas, internet, utilities, house maintenance.
 - Groceries: food, drinks, supermarket items, household essentials, snacks, chocolate, bread, milk, fruit, meat, fish, cleaning products.
 - Restaurants: restaurants, cafés, takeaway, delivery food, fast food, meals eaten outside.
@@ -73,7 +89,7 @@ Category rules:
 - Health: pharmacy, doctor, dentist, medicine, healthcare, insurance.
 - Shopping: clothes, electronics, books, furniture, cosmetics, accessories, non-food retail purchases.
 - Entertainment: cinema, games, concerts, events, hobbies, leisure activities.
-- Savings: money moved to savings, investments, emergency fund, deposits into savings accounts.
+- Savings: money moved out of the available monthly balance into savings, investments, emergency fund, or money put aside. Savings are expenses, not income.
 - Transfers: money sent to or received from another person, MBWay, bank transfers, unclear personal payments.
 - Other: use only when no other category fits.
 
@@ -82,21 +98,64 @@ Important classification rules:
 - If the user mentions eating at a restaurant, café, takeaway, or delivery, classify it as Restaurants.
 - If the user mentions a supermarket name, classify it as Groceries.
 - If the user sends money to a person and does not explain why, classify it as Transfers and set needs_review to true.
+- If the user receives money from a person and does not explain why, classify it as Transfers and set needs_review to true, not Income.
+- If the user explicitly says the received money is salary, wage, freelance payment, refund, bonus, or income, classify it as Income.
 - If the transaction purpose is unclear, set needs_review to true.
 - If the merchant is missing but the description is clear, do not invent a merchant.
 
-Output format example:
+Examples:
+
+Input:
+"received 1000 euros salary"
+
+Output:
 [
   {
     "date": "19-01-2025",
-    "description": "Chocolate",
+    "description": "Salary",
     "merchant": null,
-    "amount": -10,
+    "amount": 1000,
+    "currency": "EUR",
+    "category": "Income",
+    "type": "income",
+    "confidence": 0.95,
+    "needs_review": false
+  }
+]
+
+Input:
+"saved 200 euros"
+
+Output:
+[
+  {
+    "date": "19-01-2025",
+    "description": "Savings",
+    "merchant": null,
+    "amount": -200,
+    "currency": "EUR",
+    "category": "Savings",
+    "type": "expense",
+    "confidence": 0.9,
+    "needs_review": true
+  }
+]
+
+Input:
+"spent 40 euros at Continente"
+
+Output:
+[
+  {
+    "date": "19-01-2025",
+    "description": "Continente",
+    "merchant": "Continente",
+    "amount": -40,
     "currency": "EUR",
     "category": "Groceries",
     "type": "expense",
-    "confidence": 0.85,
-    "needs_review": true
+    "confidence": 0.95,
+    "needs_review": false
   }
 ]
 """

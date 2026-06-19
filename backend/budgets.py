@@ -1,18 +1,9 @@
 from validators import ALLOWED_CATEGORIES
 from storage import (
-    load_budgets,
-    save_budgets,
     load_category_budgets,
     save_category_budgets,
 )
 
-
-def set_monthly_budget(month: str, amount: float):
-    budgets = load_budgets()
-    budgets[month] = amount
-    save_budgets(budgets)
-
-    print(f"Budget for {month} set to €{amount:.2f}")
 
 
 def set_category_budget(month: str, category: str, amount: float):

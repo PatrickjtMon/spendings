@@ -2,7 +2,6 @@ import json
 
 from storage import (
     load_saved_transactions,
-    load_budgets,
     load_category_budgets,
     save_all_transactions,
 )
@@ -20,14 +19,14 @@ from ai import (
 
 def build_monthly_summary_data(month: str):
     transactions = load_saved_transactions()
-    budgets = load_budgets()
     category_budgets = load_category_budgets()
 
     month_transactions = []
     needs_review_transactions = []
 
     total_income = 0
-    total_spent = 0
+    total_expenses = 0
+    total_savings = 0
     category_totals = {}
 
     for transaction in transactions:
@@ -36,40 +35,55 @@ def build_monthly_summary_data(month: str):
         if transaction_month != month:
             continue
 
+        month_transactions.append(transaction)
+
         if transaction.get("needs_review"):
             needs_review_transactions.append(transaction)
 
-        month_transactions.append(transaction)
-
         amount = transaction["amount"]
+        category = transaction["category"]
+        transaction_type = transaction["type"]
 
-        if amount < 0:
-            expense_amount = abs(amount)
-            total_spent += expense_amount
-
-            category = transaction["category"]
-            category_totals[category] = category_totals.get(category, 0) + expense_amount
-
-        elif amount > 0:
+        if amount > 0 and transaction_type == "income":
             total_income += amount
+
+        elif amount < 0:
+            expense_amount = abs(amount)
+
+            if category == "Savings":
+                total_savings += expense_amount
+            else:
+                total_expenses += expense_amount
+
+            category_totals[category] = category_totals.get(category, 0) + expense_amount
 
     if not month_transactions:
         return None
 
-    net_balance = total_income - total_spent
+    monthly_budget = total_income
+    total_outflow = total_expenses + total_savings
+    remaining = monthly_budget - total_outflow
+
+    if monthly_budget > 0:
+        savings_rate = total_savings / monthly_budget
+    else:
+        savings_rate = 0
 
     return {
         "month": month,
-        "monthly_budget": budgets.get(month),
-        "category_budgets": category_budgets.get(month, {}),
+        "monthly_budget": monthly_budget,
+        "budget_source": "income",
         "total_income": total_income,
-        "total_spent": total_spent,
-        "net_balance": net_balance,
+        "total_expenses": total_expenses,
+        "total_savings": total_savings,
+        "total_outflow": total_outflow,
+        "remaining": remaining,
+        "savings_rate": savings_rate,
+        "category_budgets": category_budgets.get(month, {}),
         "category_totals": category_totals,
         "transaction_count": len(month_transactions),
         "needs_review_transactions": needs_review_transactions,
     }
-
 
 def generate_monthly_insights(month: str):
     summary_data = build_monthly_summary_data(month)
@@ -201,55 +215,3 @@ def ask_monthly_question(month: str, question: str):
     print(response_text)
     print()
 
-def build_monthly_summary_data(month: str):
-    transactions = load_saved_transactions()
-    budgets = load_budgets()
-    category_budgets = load_category_budgets()
-
-    month_transactions = []
-
-    needs_review_transactions = []
-
-    total_income = 0
-    total_spent = 0
-    category_totals = {}
-
-    for transaction in transactions:
-        transaction_month = get_transaction_month(transaction["date"])
-
-        if transaction_month != month:
-            continue
-
-        if transaction.get("needs_review"):
-            needs_review_transactions.append(transaction)
-
-        month_transactions.append(transaction)
-
-        amount = transaction["amount"]
-
-        if amount < 0:
-            expense_amount = abs(amount)
-            total_spent += expense_amount
-
-            category = transaction["category"]
-            category_totals[category] = category_totals.get(category, 0) + expense_amount
-
-        elif amount > 0:
-            total_income += amount
-
-    if not month_transactions:
-        return None
-
-    net_balance = total_income - total_spent
-
-    return {
-        "month": month,
-        "monthly_budget": budgets.get(month),
-        "category_budgets": category_budgets.get(month, {}),
-        "total_income": total_income,
-        "total_spent": total_spent,
-        "net_balance": net_balance,
-        "category_totals": category_totals,
-        "transaction_count": len(month_transactions),
-        "needs_review_transactions": needs_review_transactions,
-    }

@@ -88,3 +88,56 @@ def delete_recurring_expense(recurring_id: str):
 
     print("Deleted recurring expense:")
     print(json.dumps(expense_to_delete, indent=2, ensure_ascii=False))
+
+
+def transaction_matches_recurring(transaction, recurring_expense):
+    recurring_name = recurring_expense["name"].lower()
+    transaction_description = transaction.get("description", "") or ""
+    transaction_merchant = transaction.get("merchant", "") or ""
+
+    transaction_text = f"{transaction_description} {transaction_merchant}".lower()
+
+    recurring_amount = abs(recurring_expense["amount"])
+    transaction_amount = abs(transaction["amount"])
+
+    amount_matches = abs(transaction_amount - recurring_amount) <= 1
+    name_matches = recurring_name in transaction_text
+    category_matches = transaction["category"] == recurring_expense["category"]
+
+    return amount_matches and name_matches and category_matches
+
+
+def get_recurring_status_for_month(month: str, transactions):
+    recurring_expenses = load_recurring_expenses()
+
+    active_recurring_expenses = [
+        expense
+        for expense in recurring_expenses
+        if expense.get("active", True)
+    ]
+
+    status_list = []
+
+    for recurring_expense in active_recurring_expenses:
+        matching_transaction = None
+
+        for transaction in transactions:
+            if transaction_matches_recurring(transaction, recurring_expense):
+                matching_transaction = transaction
+                break
+
+        if matching_transaction:
+            status = "paid"
+        else:
+            status = "unpaid"
+
+        status_list.append({
+            "id": recurring_expense["id"],
+            "name": recurring_expense["name"],
+            "amount": recurring_expense["amount"],
+            "category": recurring_expense["category"],
+            "status": status,
+            "matching_transaction_id": matching_transaction.get("id") if matching_transaction else None,
+        })
+
+    return status_list
