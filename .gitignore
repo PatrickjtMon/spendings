@@ -3,3 +3,4 @@ venv/
 __pycache__/
 transactions.json
 budgets.json
+category_budgets.json
