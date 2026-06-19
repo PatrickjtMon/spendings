@@ -2,7 +2,6 @@ import os
 import re
 import json
 import uuid
-
 from ai import (
     analyze_text,
     generate_insights_response,
@@ -10,6 +9,15 @@ from ai import (
     answer_monthly_question_response,
     detect_anomalies_response,
     recategorize_response,
+)
+from storage import (
+    load_saved_transactions,
+    save_all_transactions,
+    save_transactions,
+    load_budgets,
+    save_budgets,
+    load_category_budgets,
+    save_category_budgets,
 )
 
 
@@ -47,11 +55,6 @@ REQUIRED_FIELDS = {
     "needs_review",
 }
 
-DATA_FILE = "transactions.json"
-
-BUDGETS_FILE = "budgets.json"
-
-CATEGORY_BUDGETS_FILE = "category_budgets.json"
 
 def validate_transactions(data):
     if not isinstance(data, list):
@@ -156,21 +159,6 @@ def review_transactions(transactions):
 
     return confirmed_transactions
 
-def load_saved_transactions():
-    if not os.path.exists(DATA_FILE):
-        return []
-
-    with open(DATA_FILE, "r", encoding="utf-8") as file:
-        return json.load(file)
-
-
-def save_transactions(transactions):
-    saved_transactions = load_saved_transactions()
-    saved_transactions.extend(transactions)
-
-    with open(DATA_FILE, "w", encoding="utf-8") as file:
-        json.dump(saved_transactions, file, indent=2, ensure_ascii=False)
-
 def get_transaction_month(date: str) -> str:
     # date format: DD-MM-YYYY
     day, month, year = date.split("-")
@@ -204,7 +192,6 @@ def show_monthly_summary(month_filter=None):
                 }
 
             monthly_totals[transaction_month]["total_spent"] += amount
-
             monthly_totals[transaction_month]["categories"][category] = (
                 monthly_totals[transaction_month]["categories"].get(category, 0) + amount
             )
@@ -212,8 +199,7 @@ def show_monthly_summary(month_filter=None):
     if not monthly_totals:
         print("No transactions found for that month.")
         return
-    
-    
+
     for month, data in monthly_totals.items():
         print(f"\nSummary for {month}:")
         budget = budgets.get(month)
@@ -235,39 +221,28 @@ def show_monthly_summary(month_filter=None):
 
         print("\nBy category:")
 
-    month_category_budgets = category_budgets.get(month, {})
+        month_category_budgets = category_budgets.get(month, {})
 
-    for category, total in data["categories"].items():
-        category_budget = month_category_budgets.get(category)
+        for category, total in data["categories"].items():
+            category_budget = month_category_budgets.get(category)
 
-        if category_budget is not None:
-            remaining = category_budget - total
+            if category_budget is not None:
+                remaining = category_budget - total
 
-            if remaining < 0:
-                print(
-                    f"- {category}: €{total:.2f} / €{category_budget:.2f} "
-                    f"(over by €{abs(remaining):.2f})"
-                )
+                if remaining < 0:
+                    print(
+                        f"- {category}: €{total:.2f} / €{category_budget:.2f} "
+                        f"(over by €{abs(remaining):.2f})"
+                    )
+                else:
+                    print(
+                        f"- {category}: €{total:.2f} / €{category_budget:.2f} "
+                        f"(remaining €{remaining:.2f})"
+                    )
             else:
-                print(
-                    f"- {category}: €{total:.2f} / €{category_budget:.2f} "
-                    f"(remaining €{remaining:.2f})"
-                )
-        else:
-            print(f"- {category}: €{total:.2f} / no category budget")
+                print(f"- {category}: €{total:.2f} / no category budget")
 
-def load_budgets():
-    if not os.path.exists(BUDGETS_FILE):
-        return {}
-
-    with open(BUDGETS_FILE, "r", encoding="utf-8") as file:
-        return json.load(file)
-
-
-def save_budgets(budgets):
-    with open(BUDGETS_FILE, "w", encoding="utf-8") as file:
-        json.dump(budgets, file, indent=2, ensure_ascii=False)
-
+        print()
 
 def set_monthly_budget(month: str, amount: float):
     budgets = load_budgets()
@@ -275,20 +250,6 @@ def set_monthly_budget(month: str, amount: float):
     save_budgets(budgets)
 
     print(f"Budget for {month} set to €{amount:.2f}")
-
-
-def load_category_budgets():
-    if not os.path.exists(CATEGORY_BUDGETS_FILE):
-        return {}
-
-    with open(CATEGORY_BUDGETS_FILE, "r", encoding="utf-8") as file:
-        return json.load(file)
-
-
-def save_category_budgets(category_budgets):
-    with open(CATEGORY_BUDGETS_FILE, "w", encoding="utf-8") as file:
-        json.dump(category_budgets, file, indent=2, ensure_ascii=False)
-
 
 def set_category_budget(month: str, category: str, amount: float):
     if category not in ALLOWED_CATEGORIES:
@@ -381,8 +342,7 @@ def delete_transaction(transaction_id: str):
 
     transactions.remove(transaction_to_delete)
 
-    with open(DATA_FILE, "w", encoding="utf-8") as file:
-        json.dump(transactions, file, indent=2, ensure_ascii=False)
+    save_all_transactions(transactions)
 
     print("Deleted transaction:")
     print(json.dumps(transaction_to_delete, indent=2, ensure_ascii=False))
@@ -473,9 +433,7 @@ def edit_transaction(transaction_id: str, field: str, new_value: str):
 
             transaction[field] = new_value
 
-            with open(DATA_FILE, "w", encoding="utf-8") as file:
-                json.dump(transactions, file, indent=2, ensure_ascii=False)
-
+            save_all_transactions(transactions)
             print("Updated transaction:")
             print(json.dumps(transaction, indent=2, ensure_ascii=False))
             return
@@ -675,8 +633,7 @@ def recategorize_month(month: str):
             if transaction.get("id") == transaction_id:
                 transaction["category"] = suggested_category
 
-    with open(DATA_FILE, "w", encoding="utf-8") as file:
-        json.dump(transactions, file, indent=2, ensure_ascii=False)
+    save_all_transactions(transactions)
 
     print("Category changes applied.")
 
