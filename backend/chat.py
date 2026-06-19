@@ -14,8 +14,6 @@ from storage import (
     load_saved_transactions,
     save_all_transactions,
     save_transactions,
-    load_budgets,
-    save_budgets,
     load_category_budgets,
     save_category_budgets,
 )
@@ -29,7 +27,6 @@ from validators import (
 )
 from json_utils import parse_llm_json
 from budgets import (
-    set_monthly_budget,
     set_category_budget,
 )
 from transactions import (
@@ -50,7 +47,11 @@ from finance_ai import (
     ask_monthly_question
 )
 from summaries import show_monthly_summary
-
+from recurring import (
+    add_recurring_expense,
+    show_recurring_expenses,
+    delete_recurring_expense,
+)
 def ask_for_amount() -> str:
     while True:
         amount = input("How much did you spend? ")
@@ -82,7 +83,6 @@ Transactions:
   delete transaction_id
 
 Budgets:
-  budget MM-YYYY amount
   category-budget MM-YYYY Category amount
 
 Summaries:
@@ -95,6 +95,14 @@ AI features:
   ask MM-YYYY your question
   anomalies MM-YYYY
   recategorize MM-YYYY
+
+Recurring expenses:
+  recurring
+  add-recurring name amount category
+  delete-recurring recurring_id
+          
+Note:
+  Monthly budget is calculated automatically from monthly income.      
 
 Other:
   help
@@ -117,19 +125,6 @@ while True:
     if user_input.lower().startswith("summary "):
         month = user_input.split(" ", 1)[1]
         show_monthly_summary(month)
-        continue
-
-    if user_input.lower().startswith("budget "):
-        parts = user_input.split()
-
-        if len(parts) != 3:
-            print("Use: budget MM-YYYY amount")
-            continue
-
-        month = parts[1]
-        amount = float(parts[2])
-
-        set_monthly_budget(month, amount)
         continue
 
     if user_input.lower().startswith("category-budget "):
@@ -248,6 +243,40 @@ while True:
         month = parts[1]
         recategorize_month(month)
         continue
+
+    if user_input.lower() == "recurring":
+        show_recurring_expenses()
+        continue
+
+
+    if user_input.lower().startswith("add-recurring "):
+        parts = user_input.split()
+
+        if len(parts) < 4:
+            print("Use: add-recurring name amount category")
+            print("Example: add-recurring Netflix 14 Subscriptions")
+            continue
+
+        name = " ".join(parts[1:-2])
+        amount = float(parts[-2])
+        category = parts[-1]
+
+        add_recurring_expense(name, amount, category)
+        continue
+
+
+    if user_input.lower().startswith("delete-recurring "):
+        parts = user_input.split()
+
+        if len(parts) != 2:
+            print("Use: delete-recurring recurring_id")
+            continue
+
+        recurring_id = parts[1]
+
+        delete_recurring_expense(recurring_id)
+        continue
+    
     has_money = user_mentioned_money(user_input)
     has_desc = has_description(user_input)
 
