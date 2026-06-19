@@ -19,88 +19,14 @@ from storage import (
     load_category_budgets,
     save_category_budgets,
 )
-
-
-
-ALLOWED_CATEGORIES = {
-    "Income",
-    "Housing",
-    "Groceries",
-    "Restaurants",
-    "Transport",
-    "Subscriptions",
-    "Health",
-    "Shopping",
-    "Entertainment",
-    "Savings",
-    "Transfers",
-    "Other",
-}
-
-ALLOWED_TYPES = {
-    "income",
-    "expense",
-    "transfer",
-}
-
-REQUIRED_FIELDS = {
-    "date",
-    "description",
-    "merchant",
-    "amount",
-    "currency",
-    "category",
-    "type",
-    "confidence",
-    "needs_review",
-}
-
-
-def validate_transactions(data):
-    if not isinstance(data, list):
-        print("Invalid response: AI output must be a list.")
-        return None
-
-    valid_transactions = []
-
-    for transaction in data:
-        if not isinstance(transaction, dict):
-            print("Invalid transaction: each item must be an object.")
-            continue
-
-        missing_fields = REQUIRED_FIELDS - transaction.keys()
-
-        if missing_fields:
-            print(f"Invalid transaction: missing fields {missing_fields}")
-            continue
-
-        if not isinstance(transaction["amount"], (int, float)):
-            print("Invalid transaction: amount must be a number.")
-            continue
-
-        if transaction["category"] not in ALLOWED_CATEGORIES:
-            print(f"Invalid transaction: invalid category {transaction['category']}")
-            continue
-
-        if transaction["type"] not in ALLOWED_TYPES:
-            print(f"Invalid transaction: invalid type {transaction['type']}")
-            continue
-
-        if not 0 <= transaction["confidence"] <= 1:
-            print("Invalid transaction: confidence must be between 0 and 1.")
-            continue
-
-        if not isinstance(transaction["needs_review"], bool):
-            print("Invalid transaction: needs_review must be true or false.")
-            continue
-
-        valid_transactions.append(transaction)
-
-    return valid_transactions
-
-def user_mentioned_money(text: str) -> bool:
-    pattern = r"(€\s*\d+([.,]\d+)?|\d+([.,]\d+)?\s*(euros?|eur|€)?$|\d+([.,]\d+)?\s*(euros?|eur|€))"
-    return bool(re.search(pattern, text.lower().strip()))
+from validators import (
+    ALLOWED_CATEGORIES,
+    ALLOWED_TYPES,
+    validate_transactions,
+    user_mentioned_money,
+    has_description,
+    is_valid_date,
+)
 
 def ask_for_amount() -> str:
     while True:
@@ -113,17 +39,6 @@ def ask_for_amount() -> str:
             return amount
 
         print("Please enter a valid amount, for example: 10, 10 euros, or €10")
-
-def has_description(text: str) -> bool:
-    # Remove money-like parts from the text
-    text_without_money = re.sub(
-        r"(€\s*\d+([.,]\d+)?|\d+([.,]\d+)?\s*(euros?|euro|eur|€)?)",
-        "",
-        text.lower()
-    ).strip()
-
-    # If there is still meaningful text, we have a description
-    return len(text_without_money) >= 3
 
 def clean_llm_output(text: str) -> str:
     return (
@@ -439,10 +354,6 @@ def edit_transaction(transaction_id: str, field: str, new_value: str):
             return
 
     print("Transaction not found.")
-
-def is_valid_date(date: str) -> bool:
-    pattern = r"^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-\d{4}$"
-    return bool(re.match(pattern, date))
 
 def view_transaction(transaction_id: str):
     transactions = load_saved_transactions()
