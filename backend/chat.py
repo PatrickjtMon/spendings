@@ -1,22 +1,18 @@
 import os
-from dotenv import load_dotenv
-from anthropic import Anthropic
 import re
 import json
 import uuid
-from prompts import (
-    SYSTEM_PROMPT,
-    INSIGHTS_PROMPT,
-    ADVICE_PROMPT,
-    QA_PROMPT,
-    ANOMALY_PROMPT,
-    RECATEGORIZE_PROMPT,
+
+from ai import (
+    analyze_text,
+    generate_insights_response,
+    generate_advice_response,
+    answer_monthly_question_response,
+    detect_anomalies_response,
+    recategorize_response,
 )
 
-load_dotenv()
-client = Anthropic(
-    api_key= os.getenv("ANTHROPIC_API_KEY")
-)
+
 
 ALLOWED_CATEGORIES = {
     "Income",
@@ -98,21 +94,6 @@ def validate_transactions(data):
         valid_transactions.append(transaction)
 
     return valid_transactions
-
-def analyze_text(text):
-
-    responde = client.messages.create(
-        model=os.getenv("ANTHROPIC_MODEL"),
-        max_tokens=500,
-        system=SYSTEM_PROMPT,
-        messages=[
-            {"role": "user", "content": text}
-        ]
-    )
-
-    return responde.content[0].text
-
-
 
 def user_mentioned_money(text: str) -> bool:
     pattern = r"(€\s*\d+([.,]\d+)?|\d+([.,]\d+)?\s*(euros?|eur|€)?$|\d+([.,]\d+)?\s*(euros?|eur|€))"
@@ -576,20 +557,10 @@ def generate_monthly_insights(month: str):
         print("No transactions found for that month.")
         return
 
-    response = client.messages.create(
-        model=os.getenv("ANTHROPIC_MODEL"),
-        max_tokens=500,
-        system=INSIGHTS_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": json.dumps(summary_data, indent=2, ensure_ascii=False)
-            }
-        ]
-    )
+    response_text = generate_insights_response(summary_data)
 
     print(f"\nAI Insights for {month}:")
-    print(response.content[0].text)
+    print(response_text)
     print()
 
 def generate_monthly_advice(month: str):
@@ -599,22 +570,12 @@ def generate_monthly_advice(month: str):
         print("No transactions found for that month.")
         return
 
-    response = client.messages.create(
-        model=os.getenv("ANTHROPIC_MODEL"),
-        max_tokens=500,
-        system=ADVICE_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": json.dumps(summary_data, indent=2, ensure_ascii=False)
-            }
-        ]
-    )
+    response_text = generate_advice_response(summary_data)
 
     print(f"\nAI Advice for {month}:")
-    print(response.content[0].text)
+    print(response_text)
     print()
-
+    
 def ask_monthly_question(month: str, question: str):
     summary_data = build_monthly_summary_data(month)
 
@@ -622,25 +583,10 @@ def ask_monthly_question(month: str, question: str):
         print("No transactions found for that month.")
         return
 
-    user_content = {
-        "monthly_data": summary_data,
-        "question": question
-    }
-
-    response = client.messages.create(
-        model=os.getenv("ANTHROPIC_MODEL"),
-        max_tokens=500,
-        system=QA_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": json.dumps(user_content, indent=2, ensure_ascii=False)
-            }
-        ]
-    )
+    response_text = answer_monthly_question_response(summary_data, question)
 
     print(f"\nAI Answer for {month}:")
-    print(response.content[0].text)
+    print(response_text)
     print()
 
 def detect_monthly_anomalies(month: str):
@@ -650,20 +596,10 @@ def detect_monthly_anomalies(month: str):
         print("No transactions found for that month.")
         return
 
-    response = client.messages.create(
-        model=os.getenv("ANTHROPIC_MODEL"),
-        max_tokens=500,
-        system=ANOMALY_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": json.dumps(summary_data, indent=2, ensure_ascii=False)
-            }
-        ]
-    )
+    response_text = detect_anomalies_response(summary_data)
 
     print(f"\nAI Anomalies for {month}:")
-    print(response.content[0].text)
+    print(response_text)
     print()
 
 def recategorize_month(month: str):
@@ -691,19 +627,9 @@ def recategorize_month(month: str):
         for transaction in month_transactions
     ]
 
-    response = client.messages.create(
-        model=os.getenv("ANTHROPIC_MODEL"),
-        max_tokens=1000,
-        system=RECATEGORIZE_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": json.dumps(transactions_for_ai, indent=2, ensure_ascii=False),
-            }
-        ],
-    )
+    response_text = recategorize_response(transactions_for_ai)
 
-    suggestions = parse_llm_json(response.content[0].text)
+    suggestions = parse_llm_json(response_text)
 
     if suggestions is None:
         return
